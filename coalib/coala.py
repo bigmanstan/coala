@@ -19,15 +19,18 @@ from coalib.parsing.DefaultArgParser import default_arg_parser
 from coalib.misc.Exceptions import get_exitcode
 
 
-def main():
+def main(debug=False):
     configure_logging()
 
+    args = None  # to have args variable in except block when parse_args fails
     try:
         console_printer = ConsolePrinter()
         log_printer = LogPrinter(console_printer)
         # Note: We parse the args here once to check whether to show bears or
         # not.
         args = default_arg_parser().parse_args()
+        if debug or args.debug:  # pragma: no cover
+            args.log_level = 'DEBUG'
 
         # Defer imports so if e.g. --help is called they won't be run
         from coalib.coala_modes import (
@@ -38,7 +41,7 @@ def main():
         console_printer = ConsolePrinter(print_colored=not args.no_color)
 
         if args.json:  # needs to be checked in order to display bears in json
-            return mode_json(args)
+            return mode_json(args, debug=debug)
 
         if args.show_bears:
             from coalib.settings.ConfigurationGathering import (
@@ -69,15 +72,23 @@ def main():
             return 0
 
     except BaseException as exception:  # pylint: disable=broad-except
+        if debug:  # pragma: no cover
+            raise
+
+        if args and args.debug:  # pragma: no cover
+            import ipdb
+            with ipdb.launch_ipdb_on_exception():
+                raise
+
         return get_exitcode(exception, log_printer)
 
     if args.format:
-        return mode_format()
+        return mode_format(args, debug=debug)
 
     if args.non_interactive:
-        return mode_non_interactive(console_printer, args)
+        return mode_non_interactive(console_printer, args, debug=debug)
 
-    return mode_normal(console_printer, log_printer)
+    return mode_normal(console_printer, log_printer, args, debug=debug)
 
 
 if __name__ == '__main__':  # pragma: no cover
